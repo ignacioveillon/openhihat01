@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FM Hi-Hat Playground</title>
+  <script src="https://cdn.jsdelivr.net/npm/tone@latest/build/Tone.min.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    h1 { margin-bottom: 10px; }
+    .controls { margin-top: 20px; }
+    .control-group { margin-bottom: 15px; }
+    label { display: inline-block; width: 200px; }
+    input[type=range] { width: 200px; }
+  </style>
+</head>
+<body>
+  <h1>FM Hi-Hat Playground</h1>
+  <button id="startBtn">Start FM Layer</button>
+  <button id="stopBtn">Stop FM Layer</button>
+  <button id="startNoise">Start Noise</button>
+  <button id="stopNoise">Stop Noise</button>
+  <button id="startAll">Start Both Layers</button>
+  <button id="stopAll">Stop FM Layer and Noise</button>
+  <button id="noteC6">Set Note: C6</button>
+  <button id="noteC7">Set Note: C7</button>
+
+  <div class="controls">
+    <h2>Synth Parameters</h2>
+    <div class="control-group">
+      <label for="volume">FM Volume:</label>
+      <input id="volume" type="range" min="0" max="1" step="0.01" value="0.5">
+      <span id="volumeVal">0.5</span>
+    </div>
+    <div class="control-group">
+      <label for="harmonicity">Harmonicity:</label>
+      <input id="harmonicity" type="range" min="0" max="16" step="0.1" value="8">
+      <span id="harmonicityVal">8</span>
+    </div>
+    <div class="control-group">
+      <label for="modIndex">Modulation Index:</label>
+      <input id="modIndex" type="range" min="0" max="32" step="0.1" value="32">
+      <span id="modIndexVal">32</span>
+    </div>
+
+    <h3>Carrier Envelope</h3>
+    <div class="control-group">
+      <label for="carrierAttack">Attack:</label>
+      <input id="carrierAttack" type="range" min="0.001" max="0.5" step="0.001" value="0.001">
+      <span id="carrierAttackVal">0.001</span>
+    </div>
+    <div class="control-group">
+      <label for="carrierDecay">Decay:</label>
+      <input id="carrierDecay" type="range" min="0.05" max="0.5" step="0.001" value="0.249">
+      <span id="carrierDecayVal">0.249</span>
+    </div>
+
+    <h3>Modulation Envelope</h3>
+    <div class="control-group">
+      <label for="modAttack">Attack:</label>
+      <input id="modAttack" type="range" min="0.001" max="0.5" step="0.001" value="0.001">
+      <span id="modAttackVal">0.001</span>
+    </div>
+    <div class="control-group">
+      <label for="modDecay">Decay:</label>
+      <input id="modDecay" type="range" min="0.05" max="0.5" step="0.001" value="0.249">
+      <span id="modDecayVal">0.249</span>
+    </div>
+
+    <div class="control-group">
+      <label for="fmHP">FM High-Pass Cutoff (Hz):</label>
+      <input id="fmHP" type="range" min="2000" max="16000" step="10" value="6000">
+      <span id="fmHPVal">6000</span>
+    </div>
+
+    <h2>Noise Layer</h2>
+    <div class="control-group">
+      <label for="noiseHP">Noise High-Pass Cutoff (Hz):</label>
+      <input id="noiseHP" type="range" min="2000" max="16000" step="10" value="6000">
+      <span id="noiseHPVal">6000</span>
+    </div>
+    <div class="control-group">
+      <label for="noiseAttack">Noise Attack:</label>
+      <input id="noiseAttack" type="range" min="0.001" max="1" step="0.001" value="0.001">
+      <span id="noiseAttackVal">0.001</span>
+    </div>
+    <div class="control-group">
+      <label for="noiseDecay">Noise Decay:</label>
+      <input id="noiseDecay" type="range" min="0.5" max="1" step="0.001" value="0.749">
+      <span id="noiseDecayVal">0.749</span>
+    </div>
+    <div class="control-group">
+      <label for="noiseVolumeSlider">Noise Volume:</label>
+      <input id="noiseVolumeSlider" type="range" min="0" max="1" step="0.01" value="0.5">
+      <span id="noiseVolumeVal">0.5</span>
+    </div>
+  </div>
+
+  <script>
+    let currentNote = "C7";
+
+    // ---------- FM SYNTH ----------
+    const metallicFM = new Tone.FMSynth({
+      harmonicity: 8,
+      modulationIndex: 32,
+      oscillator: { type: "square" },
+      envelope: { attack: 0.001, decay: 0.249, sustain: 0, release: 0 },
+      modulation: { type: "square" },
+      modulationEnvelope: { attack: 0.001, decay: 0.249, sustain: 0, release: 0 }
+    });
+
+    const gainNode = new Tone.Gain(0.5);
+    const hpFilter = new Tone.Filter({ type: "highpass", frequency: 6000, Q: 1 }).toDestination();
+
+    metallicFM.connect(gainNode);
+    gainNode.connect(hpFilter);
+
+    function triggerHiHat(time) {
+      metallicFM.triggerAttackRelease(currentNote, "16n", time);
+    }
+
+    // ---------- NOISE LAYER ----------
+    const noise = new Tone.Noise("white");
+    const noiseEnv = new Tone.AmplitudeEnvelope({ attack: 0.001, decay: 0.749, sustain: 0, release: 0 });
+    const noiseVolume = new Tone.Gain(0.5);
+    const noiseHPFilter = new Tone.Filter({ type: "highpass", frequency: 6000 }).toDestination();
+    noise.connect(noiseEnv);
+    noiseEnv.connect(noiseVolume);
+    noiseVolume.connect(noiseHPFilter);
+    let noiseLoop = null;
+
+    // ---------- FM Layer Start/Stop ----------
+    document.getElementById("startBtn").addEventListener("click", async () => {
+      await Tone.start();
+      Tone.Transport.scheduleRepeat((time) => { triggerHiHat(time); }, "4n");
+      if (Tone.Transport.state !== "started") Tone.Transport.start();
+    });
+    document.getElementById("stopBtn").addEventListener("click", () => {
+      Tone.Transport.stop();
+      Tone.Transport.cancel();
+    });
+
+    // ---------- Noise Start/Stop ----------
+    document.getElementById("startNoise").addEventListener("click", async () => {
+      await Tone.start();
+      noise.start();
+      if (noiseLoop) noiseLoop.dispose();
+      Tone.Transport.bpm.value = 140;
+      noiseLoop = new Tone.Loop((time) => { noiseEnv.triggerAttackRelease(noiseEnv.decay, time); }, "4n");
+      noiseLoop.start("0:2");
+      if (Tone.Transport.state !== "started") Tone.Transport.start();
+    });
+    document.getElementById("stopNoise").addEventListener("click", () => {
+      if (noiseLoop) { noiseLoop.stop(); noiseLoop.dispose(); noiseLoop = null; }
+      noise.stop();
+    });
+
+    // ---------- Start Both Layers ----------
+    document.getElementById("startAll").addEventListener("click", async () => {
+      await Tone.start();
+      if (!Tone.Transport.state || Tone.Transport.state !== "started") {
+        Tone.Transport.scheduleRepeat((time) => { triggerHiHat(time); }, "4n");
+      }
+      noise.start();
+      if (noiseLoop) noiseLoop.dispose();
+      Tone.Transport.bpm.value = 140;
+      noiseLoop = new Tone.Loop((time) => { noiseEnv.triggerAttackRelease(noiseEnv.decay, time); }, "4n");
+      noiseLoop.start("0:2");
+      if (Tone.Transport.state !== "started") Tone.Transport.start();
+    });
+
+    // ---------- Stop Both Layers ----------
+    document.getElementById("stopAll").addEventListener("click", () => {
+      // Stop FM layer
+      Tone.Transport.stop();
+      Tone.Transport.cancel();
+      // Stop Noise layer
+      if (noiseLoop) { noiseLoop.stop(); noiseLoop.dispose(); noiseLoop = null; }
+      noise.stop();
+      console.log("FM Layer and Noise stopped");
+    });
+
+    // ---------- NOTE BUTTONS ----------
+    document.getElementById("noteC6").addEventListener("click", () => { currentNote = "C6"; });
+    document.getElementById("noteC7").addEventListener("click", () => { currentNote = "C7"; });
+
+    // ---------- FM SLIDERS ----------
+    document.getElementById("volume").addEventListener("input", (e) => { gainNode.gain.value = parseFloat(e.target.value); document.getElementById("volumeVal").textContent = e.target.value; });
+    document.getElementById("harmonicity").addEventListener("input", (e) => { metallicFM.harmonicity.value = parseFloat(e.target.value); document.getElementById("harmonicityVal").textContent = e.target.value; });
+    document.getElementById("modIndex").addEventListener("input", (e) => { metallicFM.modulationIndex.value = parseFloat(e.target.value); document.getElementById("modIndexVal").textContent = e.target.value; });
+    document.getElementById("carrierAttack").addEventListener("input", (e) => { metallicFM.envelope.attack = parseFloat(e.target.value); document.getElementById("carrierAttackVal").textContent = e.target.value; });
+    document.getElementById("carrierDecay").addEventListener("input", (e) => { metallicFM.envelope.decay = parseFloat(e.target.value); document.getElementById("carrierDecayVal").textContent = e.target.value; });
+    document.getElementById("modAttack").addEventListener("input", (e) => { metallicFM.modulationEnvelope.attack = parseFloat(e.target.value); document.getElementById("modAttackVal").textContent = e.target.value; });
+    document.getElementById("modDecay").addEventListener("input", (e) => { metallicFM.modulationEnvelope.decay = parseFloat(e.target.value); document.getElementById("modDecayVal").textContent = e.target.value; });
+    document.getElementById("fmHP").addEventListener("input", (e) => { hpFilter.frequency.value = parseFloat(e.target.value); document.getElementById("fmHPVal").textContent = e.target.value; });
+
+    // ---------- NOISE SLIDERS ----------
+    document.getElementById("noiseHP").addEventListener("input", (e) => { noiseHPFilter.frequency.value = parseFloat(e.target.value); document.getElementById("noiseHPVal").textContent = e.target.value; });
+    document.getElementById("noiseAttack").addEventListener("input", (e) => { noiseEnv.attack = parseFloat(e.target.value); document.getElementById("noiseAttackVal").textContent = e.target.value; });
+    document.getElementById("noiseDecay").addEventListener("input", (e) => { noiseEnv.decay = parseFloat(e.target.value); document.getElementById("noiseDecayVal").textContent = e.target.value; });
+    document.getElementById("noiseVolumeSlider").addEventListener("input", (e) => { noiseVolume.gain.value = parseFloat(e.target.value); document.getElementById("noiseVolumeVal").textContent = e.target.value; });
+
+  </script>
+</body>
+</html>
