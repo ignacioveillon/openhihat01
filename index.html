@@ -9,7 +9,7 @@
     h1 { margin-bottom: 10px; }
     .controls { margin-top: 20px; }
     .control-group { margin-bottom: 15px; }
-    label { display: inline-block; width: 220px; }
+    label { display: inline-block; width: 200px; }
     input[type=range] { width: 200px; }
   </style>
 </head>
@@ -93,28 +93,6 @@
       <input id="noiseVolumeSlider" type="range" min="0" max="1" step="0.01" value="0.25">
       <span id="noiseVolumeVal">0.25</span>
     </div>
-
-    <h2>Hi-Hat Bus & EQ</h2>
-    <div class="control-group">
-      <label for="busGain">Hi-Hat Bus Volume:</label>
-      <input id="busGain" type="range" min="0" max="1" step="0.01" value="0.5">
-      <span id="busGainVal">0.5</span>
-    </div>
-    <div class="control-group">
-      <label for="eqLow">EQ Low Gain (dB):</label>
-      <input id="eqLow" type="range" min="-24" max="12" step="0.5" value="-12">
-      <span id="eqLowVal">-12</span>
-    </div>
-    <div class="control-group">
-      <label for="eqMid">EQ Mid Gain (dB):</label>
-      <input id="eqMid" type="range" min="-24" max="12" step="0.5" value="0">
-      <span id="eqMidVal">0</span>
-    </div>
-    <div class="control-group">
-      <label for="eqHigh">EQ High Gain (dB):</label>
-      <input id="eqHigh" type="range" min="-24" max="12" step="0.5" value="2">
-      <span id="eqHighVal">2</span>
-    </div>
   </div>
 
   <script>
@@ -131,7 +109,7 @@
     });
 
     const gainNode = new Tone.Gain(0.5);
-    const hpFilter = new Tone.Filter({ type: "highpass", frequency: 6000, Q: 1 });
+    const hpFilter = new Tone.Filter({ type: "highpass", frequency: 6000, Q: 1 }).toDestination();
     metallicFM.connect(gainNode);
     gainNode.connect(hpFilter);
 
@@ -143,20 +121,11 @@
     const noise = new Tone.Noise("white");
     const noiseEnv = new Tone.AmplitudeEnvelope({ attack: 0.001, decay: 0.430, sustain: 0, release: 0 });
     const noiseVolume = new Tone.Gain(0.25);
-    const noiseHPFilter = new Tone.Filter({ type: "highpass", frequency: 6000 });
+    const noiseHPFilter = new Tone.Filter({ type: "highpass", frequency: 6000 }).toDestination();
     noise.connect(noiseEnv);
     noiseEnv.connect(noiseVolume);
     noiseVolume.connect(noiseHPFilter);
     let noiseLoop = null;
-
-    // ---------- HI-HAT BUS & EQ ----------
-    const hiHatBus = new Tone.Gain(0.5);
-    const eq = new Tone.EQ3(-12, 0, 2).toDestination();
-
-    // route FM + Noise into hiHatBus → EQ → speakers
-    hpFilter.connect(hiHatBus);
-    noiseHPFilter.connect(hiHatBus);
-    hiHatBus.connect(eq);
 
     // ---------- FM Layer Start/Stop ----------
     document.getElementById("startBtn").addEventListener("click", async () => {
@@ -260,24 +229,6 @@
     document.getElementById("noiseVolumeSlider").addEventListener("input", (e) => {
       noiseVolume.gain.value = parseFloat(e.target.value);
       document.getElementById("noiseVolumeVal").textContent = e.target.value;
-    });
-
-    // ---------- HI-HAT BUS & EQ SLIDERS ----------
-    document.getElementById("busGain").addEventListener("input", (e) => {
-      hiHatBus.gain.value = parseFloat(e.target.value);
-      document.getElementById("busGainVal").textContent = e.target.value;
-    });
-    document.getElementById("eqLow").addEventListener("input", (e) => {
-      eq.low.value = parseFloat(e.target.value);
-      document.getElementById("eqLowVal").textContent = e.target.value;
-    });
-    document.getElementById("eqMid").addEventListener("input", (e) => {
-      eq.mid.value = parseFloat(e.target.value);
-      document.getElementById("eqMidVal").textContent = e.target.value;
-    });
-    document.getElementById("eqHigh").addEventListener("input", (e) => {
-      eq.high.value = parseFloat(e.target.value);
-      document.getElementById("eqHighVal").textContent = e.target.value;
     });
 
   </script>
